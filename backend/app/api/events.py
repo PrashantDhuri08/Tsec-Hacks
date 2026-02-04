@@ -41,3 +41,30 @@ def add_participant(event_id: int, user_id: int, db: Session = Depends(get_db)):
 def get_participants(event_id: int, db: Session = Depends(get_db)):
     participants = db.query(Participant).filter_by(event_id=event_id).all()
     return [p.user_id for p in participants]
+
+
+@router.post("/{event_id}/invite")
+def invite_by_email(event_id: int, email: str, admin_id: int, db: Session = Depends(get_db)):
+    event = db.query(Event).get(event_id)
+    if event.admin_user_id != admin_id:
+        raise Exception("Only admin allowed")
+
+    user = db.query(User).filter_by(email=email).first()
+    if not user:
+        raise Exception("User not found")
+
+    db.add(Participant(event_id=event_id, user_id=user.id, is_active=False))
+    db.commit()
+
+    return {"status": "invited, pending approval"}
+
+@router.delete("/{event_id}/participants/{user_id}")
+def remove_participant(event_id: int, user_id: int, admin_id: int, db: Session = Depends(get_db)):
+    event = db.query(Event).get(event_id)
+    if event.admin_user_id != admin_id:
+        raise Exception("Only admin allowed")
+
+    db.query(Participant).filter_by(event_id=event_id, user_id=user_id).delete()
+    db.commit()
+
+    return {"status": "removed"}
